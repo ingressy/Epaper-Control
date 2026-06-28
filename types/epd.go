@@ -82,6 +82,8 @@ func watchEPD(watcher *fsnotify.Watcher) {
 
 func loadfromfileepd() {
 	epdsMu.Lock()
+	defer epdsMu.Unlock()
+
 	file, err := os.ReadFile("epd.json")
 	if err != nil {
 		slog.Error("Fehler beim Lesen der JSON", "error", err)
@@ -95,7 +97,6 @@ func loadfromfileepd() {
 		os.Exit(1)
 	}
 	EPDs = config.EPD
-	epdsMu.Unlock()
 }
 
 func GetRoomfromID(id string) string {
@@ -112,35 +113,31 @@ func GetRoomfromID(id string) string {
 
 func SetNightSleep(id string, change bool) error {
 	epdsMu.Lock()
-	defer epdsMu.Unlock() // ← defer, nicht manuell vor WriteFile
+	defer epdsMu.Unlock()
 
-	data, err := os.ReadFile("epd.json")
-	if err != nil {
-		return err
-	}
-	var config struct {
-		EPD []Epd `json:"epd"`
-	}
-	if err := json.Unmarshal(data, &config); err != nil {
-		return err
-	}
-	for i, entry := range config.EPD {
+	// In-Memory sofort aktualisieren
+	for i, entry := range EPDs {
 		if entry.ID == id {
-			config.EPD[i].NightSleep = change
+			EPDs[i].NightSleep = change
 			break
 		}
 	}
+
+	// Datei aus aktuellem EPDs-State erzeugen (kein Re-Read nötig)
+	config := struct {
+		EPD []Epd `json:"epd"`
+	}{EPD: EPDs}
+
 	formatted, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	// Atomisches Schreiben: erst tmp, dann rename
 	tmp := "epd.json.tmp"
 	if err := os.WriteFile(tmp, formatted, 0644); err != nil {
 		return err
 	}
-	return os.Rename(tmp, "epd.json") // atomar auf Linux/macOS
+	return os.Rename(tmp, "epd.json")
 }
 
 func GetNightsleep(id string) (bool, error) {
