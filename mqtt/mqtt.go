@@ -25,13 +25,20 @@ func ConnecttoMQTT() {
 	opts.AddBroker("tcp://172.20.0.5:1883")
 	opts.SetClientID("Epaper-Control")
 
+	//auto reconnect
+	opts.SetAutoReconnect(true)
+	opts.SetConnectRetry(true)
+	opts.SetConnectRetryInterval(5 * time.Second)
+
 	client := mqtt.NewClient(opts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		panic(token.Error())
 	}
 	subscribe(client)
 
-	time.Sleep(22 * 1000)
+	//time.Sleep(22 * 1000)
+	//depatched i think
+
 	untis.Get_room_from_json()
 	handler.PrepareJSON()
 	handler.Getpicturehex()
@@ -74,13 +81,13 @@ func onAwake(c mqtt.Client, msg mqtt.Message) {
 	slog.Debug("NightSleep State", "id", id, "isNight", isNight, "err", err)
 
 	if !isNight {
-		slog.Debug("Es ist normaler Tag und dem EPD wird ein Bild zugesendet!")
+		//slog.Debug("Es ist normaler Tag und dem EPD wird ein Bild zugesendet!")
 		SendImage(c, id)
 	} else if !wasNight && isNight {
-		slog.Debug("Übergang Tag→Nacht, sende letztes Bild")
+		//slog.Debug("Übergang Tag→Nacht, sende letztes Bild")
 		SendImage(c, id)
 	} else {
-		slog.Debug("Es ist Nacht und das EPD soll schlafen!")
+		//slog.Debug("Es ist Nacht und das EPD soll schlafen!")
 		sendsleep(c, id)
 	}
 }
