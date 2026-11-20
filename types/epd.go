@@ -122,12 +122,17 @@ func SetNightSleep(id string, change bool) error {
 	epdsMu.Lock()
 	defer epdsMu.Unlock()
 
-	// In-Memory sofort aktualisieren
+	found := false
 	for i, entry := range EPDs {
 		if entry.ID == id {
 			EPDs[i].NightSleep = change
+			found = true
 			break
 		}
+	}
+
+	if !found {
+		return fmt.Errorf("id %s nicht gefunden", id)
 	}
 
 	// Datei aus aktuellem EPDs-State erzeugen (kein Re-Read nötig)

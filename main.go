@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"reflect"
+	"sync"
 	"syscall"
 
 	"github.com/gin-gonic/gin"
@@ -32,6 +33,7 @@ func main() {
 
 	var cronIDs []cron.EntryID
 	var registered []string
+	var cronMu sync.Mutex
 
 	types.Loadconfig()
 	types.Loadepd()
@@ -41,6 +43,8 @@ func main() {
 	c := cron.New()
 
 	syncCronTask := func() {
+		cronMu.Lock()
+		defer cronMu.Unlock()
 		cfg := types.GetConfig()
 		if reflect.DeepEqual(cfg.Task_time_cron, registered) {
 			return

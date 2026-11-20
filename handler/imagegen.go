@@ -83,7 +83,7 @@ func PrepareJSON() {
 		err = os.WriteFile(filename, formatted, 0644)
 		if err != nil {
 			slog.Error("Datei schreiben", "room", r.Room, "error", err)
-			return
+			continue
 		}
 
 	}

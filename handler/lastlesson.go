@@ -18,8 +18,12 @@ func IsNightSleep(id string, room string) {
 	}
 	if len(resp.Lessons) == 0 {
 		slog.Debug("Es gibt kein Unterricht in diesen Raum mehr, für das EPD:", "id", id)
-		types.SetNightSleep(id, true)
+		if err := types.SetNightSleep(id, true); err != nil {
+			slog.Error("NightSleep setzen fehlgeschlagen", "id", id, "error", err)
+		}
 	} else {
-		types.SetNightSleep(id, false)
+		if err := types.SetNightSleep(id, false); err != nil {
+			slog.Error("NightSleep setzen fehlgeschlagen", "id", id, "error", err)
+		}
 	}
 }
