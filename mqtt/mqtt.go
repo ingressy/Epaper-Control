@@ -25,13 +25,24 @@ func ConnecttoMQTT() {
 	opts.AddBroker("tcp://172.20.0.5:1883")
 	opts.SetClientID("Epaper-Control")
 
-	client := mqtt.NewClient(opts)
-	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		panic(token.Error())
+	//auto reconnect
+	opts.SetAutoReconnect(true)
+	opts.OnConnect = func(c mqtt.Client) {
+		subscribe(c)
 	}
-	subscribe(client)
 
-	time.Sleep(22 * 1000)
+	client := mqtt.NewClient(opts)
+
+	for {
+		token := client.Connect()
+		token.Wait()
+		if token.Error() == nil {
+			break
+		}
+		slog.Error("MQTT Verbindung fehlgeschlagen, versuche es in 10s erneut", "error", token.Error())
+		time.Sleep(10 * time.Second)
+	}
+
 	untis.Get_room_from_json()
 	handler.PrepareJSON()
 	handler.Getpicturehex()
@@ -52,6 +63,11 @@ func onAwake(c mqtt.Client, msg mqtt.Message) {
 	id := parts[0]
 	awakeMu.Lock()
 	awakeTimes[id] = time.Now()
+	for k, t := range awakeTimes {
+		if time.Since(t) > 25*time.Hour {
+			delete(awakeTimes, k)
+		}
+	}
 	awakeMu.Unlock()
 
 	payload := strings.Split(string(msg.Payload()), ",")
@@ -63,8 +79,12 @@ func onAwake(c mqtt.Client, msg mqtt.Message) {
 
 	slog.Info("EPD wach", "id", id, "akku", batteryvolt, "errorcode", errorcode)
 
-	battery, _ := strconv.ParseFloat(batteryvolt, 8)
-	influx.SaveBatteryInflux(id, battery)
+	battery, err := strconv.ParseFloat(batteryvolt, 64)
+	if err != nil {
+		slog.Error("Batteriewert nicht parsebar", "id", id, "wert", batteryvolt, "error", err)
+	} else {
+		influx.SaveBatteryInflux(id, battery)
+	}
 
 	room := types.GetRoomfromID(id)
 	wasNight, _ := types.GetNightsleep(id)
@@ -74,13 +94,13 @@ func onAwake(c mqtt.Client, msg mqtt.Message) {
 	slog.Debug("NightSleep State", "id", id, "isNight", isNight, "err", err)
 
 	if !isNight {
-		slog.Debug("Es ist normaler Tag und dem EPD wird ein Bild zugesendet!")
+		//slog.Debug("Es ist normaler Tag und dem EPD wird ein Bild zugesendet!")
 		SendImage(c, id)
 	} else if !wasNight && isNight {
-		slog.Debug("Übergang Tag→Nacht, sende letztes Bild")
+		//slog.Debug("Übergang Tag→Nacht, sende letztes Bild")
 		SendImage(c, id)
 	} else {
-		slog.Debug("Es ist Nacht und das EPD soll schlafen!")
+		//slog.Debug("Es ist Nacht und das EPD soll schlafen!")
 		sendsleep(c, id)
 	}
 }
@@ -131,11 +151,16 @@ func sendsleep(c mqtt.Client, id string) {
 
 	var sekunden int
 
-	//if wartun sleep for 30min if not sleep antil next lesson
-	if !types.Config.Wartung {
+	cfg := types.GetConfig()
+	if !cfg.Wartung {
 		sekunden = handler.Getwakeuptime(types.GetRoomfromID(id)) * 60
 	} else {
-		sekunden = 30 * 60
+		sekunden = cfg.Wartung_sleep_time * 60
+	}
+
+	if sekunden < 0 {
+		slog.Error("Negative Schlafdauer berechnet, sende keinen Sleep-Befehl", "id", id, "sekunden", sekunden)
+		return
 	}
 
 	send := c.Publish(responseTopic, 1, true, fmt.Sprintf("%d", sekunden))

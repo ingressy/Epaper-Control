@@ -5,21 +5,27 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 const outputDir = "untis/cache/"
 
+var httpClient = &http.Client{Timeout: 10 * time.Second}
+
 func Get_room_from_json() {
 	data, err := os.ReadFile("untis/room.json")
 	if err != nil {
-		panic(err)
+		slog.Error("room.json nicht lesbar", "error", err)
+		return
 	}
 
 	var rooms []types.Room
 	if err := json.Unmarshal(data, &rooms); err != nil {
-		panic(err)
+		slog.Error("room.json Parsefehler", "error", err)
+		return
 	}
 
 	for _, r := range rooms {
@@ -28,12 +34,17 @@ func Get_room_from_json() {
 }
 
 func Get_data(room string) {
-	resp, err := http.Get("http://172.20.0.3:71/untis?room=" + room)
+	resp, err := httpClient.Get("http://172.20.0.3:71/untis?room=" + url.QueryEscape(room))
 	if err != nil {
 		slog.Error("Untis Microservice nicht erreichbar", "error", err)
 		return
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		slog.Error("Untis Mircoservice Status", "room", room, "status", resp.StatusCode)
+		return
+	}
 
 	var data map[string]interface{}
 	err = json.NewDecoder(resp.Body).Decode(&data)

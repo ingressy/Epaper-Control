@@ -10,12 +10,15 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
+var logCron *cron.Cron
+
 func LoggingHandler() {
+	cfg := types.GetConfig()
 	willi := &lumberjack.Logger{
-		Filename:   types.Config.Log_Filename,
-		MaxAge:     types.Config.Log_Max_Age,
-		MaxBackups: types.Config.Log_Max_Backups,
-		Compress:   types.Config.Log_compress,
+		Filename:   cfg.Log_Filename,
+		MaxAge:     cfg.Log_Max_Age,
+		MaxBackups: cfg.Log_Max_Backups,
+		Compress:   cfg.Log_compress,
 	}
 
 	multiwriter := io.MultiWriter(willi, os.Stdout)
@@ -26,14 +29,22 @@ func LoggingHandler() {
 
 	slog.SetDefault(logger)
 
-	c := cron.New()
-	c.AddFunc("0 0 * * *", func() {
+	logCron := cron.New()
+	if _, err := logCron.AddFunc("0 0 * * *", func() {
 		if err := willi.Rotate(); err != nil {
 			logger.Error("log rotation error", "err", err)
 			return
 		}
 		slog.Info("log rotated")
-	})
+	}); err != nil {
+		logger.Error("log rotation cron error", "err", err)
+	}
 
-	c.Start()
+	logCron.Start()
+}
+
+func StopLogging() {
+	if logCron != nil {
+		logCron.Stop()
+	}
 }

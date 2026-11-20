@@ -15,7 +15,7 @@ import (
 func SendImage(c mqtt.Client, id string) {
 	time.Sleep(5 * time.Second)
 	//if wartung is enable send wartungs image
-	if types.Config.Wartung {
+	if types.GetConfig().Wartung {
 		imageData, err := loadImage("mqtt/wartung.png")
 
 		if err != nil {
@@ -38,6 +38,7 @@ func SendImage(c mqtt.Client, id string) {
 		data, err := os.ReadFile(filepath.Join(hexDir, room+".hex"))
 		if err != nil {
 			slog.Error("Hex nicht lesbar", "error", err)
+			return
 		}
 
 		// Hex-String → []byte
@@ -47,7 +48,8 @@ func SendImage(c mqtt.Client, id string) {
 			p = strings.TrimSpace(p)
 			val, err := strconv.ParseUint(strings.TrimPrefix(p, "0x"), 16, 8)
 			if err != nil {
-				slog.Error("Hex nicht lesbar", "error", err)
+				slog.Error("Hex nicht parsebar, sende kein korruptes Bild", "room", room, "index", i, "error", err)
+				return
 			}
 			imageBytes[i] = byte(val)
 		}

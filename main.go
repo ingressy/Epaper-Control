@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"reflect"
 	"syscall"
 
 	"github.com/gin-gonic/gin"
@@ -28,6 +29,10 @@ import (
 // @in header
 // @name Authorization
 func main() {
+
+	var cronIDs []cron.EntryID
+	var registered []string
+
 	types.Loadconfig()
 	types.Loadepd()
 	handler.LoggingHandler()
@@ -35,18 +40,42 @@ func main() {
 
 	c := cron.New()
 
-	for _, task := range types.Config.Task_time_cron {
-		task := task
+	syncCronTask := func() {
+		cfg := types.GetConfig()
+		if reflect.DeepEqual(cfg.Task_time_cron, registered) {
+			return
+		}
+		for _, id := range cronIDs {
+			c.Remove(id)
+		}
 
-		slog.Info(task + " registiert ...")
+		cronIDs = nil
+		registered = nil
 
-		c.AddFunc(task, func() {
-			slog.Info("Cron wird ausgeführt:", "task", task)
-			untis.Get_room_from_json()
-			handler.PrepareJSON()
-			handler.Getpicturehex()
-		})
+		for _, task := range cfg.Task_time_cron {
+			task := task
+			slog.Info(task + " registiert ...")
+
+			id, err := c.AddFunc(task, func() {
+				slog.Info("Cron wird ausgeführt:", "task", task)
+				untis.Get_room_from_json()
+				handler.PrepareJSON()
+				handler.Getpicturehex()
+			})
+			if err != nil {
+				slog.Error("Cron Task ungültig", "task", task, "error", err)
+				continue
+			}
+			cronIDs = append(cronIDs, id)
+			registered = append(registered, task)
+		}
 	}
+	syncCronTask()
+
+	if _, err := c.AddFunc("*/1 * * * *", syncCronTask); err != nil {
+		slog.Error("Sync-Cron konnte nicht registiert werden", "error", err)
+	}
+
 	c.Start()
 	influx.InitInflux()
 
@@ -67,9 +96,15 @@ func main() {
 
 	go mqtt.ConnecttoMQTT()
 
-	r.Run("0.0.0.0:80")
+	go func() {
+		if err := r.Run("0.0.0.0:80"); err != nil {
+			slog.Error("HTTP Server beendet mit Fehler", "error", err)
+		}
+	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
+	handler.StopLogging()
+	slog.Info("Server wird beendet")
 }

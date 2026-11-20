@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -25,15 +26,19 @@ type ImageResponse struct {
 const outputDir = "handler/cache/"
 const hexDir = "handler/image_hex/"
 
+var httpClient = &http.Client{Timeout: 10 * time.Second}
+
 func PrepareJSON() {
 	data, err := os.ReadFile("untis/room.json")
 	if err != nil {
-		panic(err)
+		slog.Error("room.json nicht lesbar", "error", err)
+		return
 	}
 
 	var rooms []types.Room
 	if err := json.Unmarshal(data, &rooms); err != nil {
-		panic(err)
+		slog.Error("room.json Parsefehler", "error", err)
+		return
 	}
 
 	// Ordner erstellen falls nicht vorhanden
@@ -51,7 +56,8 @@ func PrepareJSON() {
 
 		var resp Response
 		if err := json.Unmarshal(data, &resp); err != nil {
-			return
+			slog.Error("Cache Parsefehler", "room", r.Room, "error", err)
+			continue
 		}
 		//time cheat
 		//today := now().Format("2006-01-02")
@@ -76,7 +82,7 @@ func PrepareJSON() {
 		filename := filepath.Join(outputDir, r.Room+".json")
 		err = os.WriteFile(filename, formatted, 0644)
 		if err != nil {
-			slog.Error("Datei schreiben", "error", err)
+			slog.Error("Datei schreiben", "room", r.Room, "error", err)
 			return
 		}
 
@@ -87,12 +93,14 @@ func PrepareJSON() {
 func Getpicturehex() {
 	data, err := os.ReadFile("untis/room.json")
 	if err != nil {
-		panic(err)
+		slog.Error("room.json nicht lesbar", "error", err)
+		return
 	}
 
 	var rooms []types.Room
 	if err := json.Unmarshal(data, &rooms); err != nil {
-		panic(err)
+		slog.Error("room.json Parsefehler", "error", err)
+		return
 	}
 
 	//create folder for image hex json
@@ -109,33 +117,41 @@ func Getpicturehex() {
 			continue
 		}
 		// generate image
-		httpResp, err := http.Post("http://172.20.0.4:72/generate", "application/json", bytes.NewBuffer(formatted))
+		httpResp, err := httpClient.Post("http://172.20.0.4:72/generate", "application/json", bytes.NewBuffer(formatted))
 		if err != nil {
 			slog.Error("POST Fehler", "room", r.Room, "error", err)
 			continue
 		}
-		defer httpResp.Body.Close()
 		_, err = io.ReadAll(httpResp.Body)
+		httpResp.Body.Close()
 		if err != nil {
 			slog.Error("Antwort lesen", "error", err)
+			continue
+		}
+
+		if httpResp.StatusCode != http.StatusOK {
+			slog.Error("ImageGen POST Status", "room", r.Room, "status", httpResp.StatusCode)
 			continue
 		}
 
 		// get image hex
-		httpResp, err = http.Get("http://172.20.0.4:72/image?room=" + r.Room)
+		httpResp, err = httpClient.Get("http://172.20.0.4:72/image?room=" + url.QueryEscape(r.Room))
 		if err != nil {
 			slog.Error("Fehler", "error", err)
 			continue
 		}
-		defer httpResp.Body.Close()
 
 		body, err := io.ReadAll(httpResp.Body)
+		httpResp.Body.Close()
 		if err != nil {
 			slog.Error("Antwort lesen", "error", err)
 			continue
 		}
 
-		//fmt.Printf("Raw Antwort:", body)
+		if httpResp.StatusCode != http.StatusOK {
+			slog.Error("ImageGen Get Status", "room", r.Room, "status", httpResp.StatusCode)
+			continue
+		}
 
 		// JSON parsen
 		var imgResp ImageResponse

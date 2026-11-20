@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"os"
+	"sync"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -19,15 +20,28 @@ type config struct {
 	Log_compress       bool     `json:"log_compress"`
 }
 
-var Config config
+var (
+	Config   config
+	configMu sync.RWMutex
+)
+
+// Caller for config struct
+func GetConfig() config {
+	configMu.RLock()
+	defer configMu.RUnlock()
+	return Config
+}
 
 func Loadconfig() {
-	loadFromFile()
+	if err := loadFromFile(); err != nil {
+		slog.Error("config.json konnte nicht geladen werden", "err", err)
+		os.Exit(1)
+	}
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		slog.Error("Fehler beim Erstellen des Watchers", "error", err)
-		os.Exit(0)
+		os.Exit(1)
 	}
 	if err := watcher.Add("config.json"); err != nil {
 		slog.Error("Fehler beim Hinzufügen der Datei", "error", err)
@@ -48,7 +62,9 @@ func watchConfig(watcher *fsnotify.Watcher) {
 			}
 			if event.Has(fsnotify.Write) || event.Has(fsnotify.Create) {
 				slog.Info("config.json geändert, wird neu eingelesen")
-				loadFromFile()
+				if err := loadFromFile(); err != nil {
+					slog.Error("config.json ungültig, alte Config bleibt aktiv", "err", err)
+				}
 			}
 		case err, ok := <-watcher.Errors:
 			if !ok {
@@ -59,20 +75,29 @@ func watchConfig(watcher *fsnotify.Watcher) {
 	}
 }
 
-func loadFromFile() {
+func loadFromFile() error {
+	var cfg config
+
 	file, err := os.ReadFile("config.json")
 	if err != nil {
-		slog.Error("Fehler beim Lesen der JSON", "error", err)
-		os.Exit(1)
+		return err
 	}
-	err = json.Unmarshal(file, &Config)
-	if err != nil {
-		slog.Error("Fehler beim Lesen der JSON", "error", err)
-		os.Exit(1)
+	if err := json.Unmarshal(file, &cfg); err != nil {
+		return err
 	}
+	configMu.Lock()
+	Config = cfg
+	configMu.Unlock()
+	return nil
 }
 
 func SaveConfig() error {
+	configMu.RLock()
+	defer configMu.RUnlock()
+	return saveConfigLocked()
+}
+
+func saveConfigLocked() error {
 	data, err := json.MarshalIndent(Config, "", "  ")
 	if err != nil {
 		return err

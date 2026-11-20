@@ -9,6 +9,13 @@ networks:
 services:
   epaper-control:
     image: epaper-control:v1
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      epaper-untis:
+        condition: service_started
+      epaper-imagegen:
+        condition: service_started
     ports:
       - "70:70"
       - "80:80"
@@ -21,10 +28,6 @@ services:
       - ./epaper-control/epd.json:/root/epd.json
       - ./epaper-control/secrets:/root/secrets
       - ./epaper-control/logs:/root/logs
-    depends_on:
-      - mosquitto
-      - epaper-untis
-      - epaper-imagegen
     networks:
       epaper-net:
         ipv4_address: 172.20.0.2
@@ -62,6 +65,12 @@ services:
       - ./epaper-control/mosquitto/data:/mosquitto/data
       - ./epaper-control/mosquitto/log:/mosquitto/log
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -t '$$SYS/broker/uptime' -C 1 -W 5 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       epaper-net:
         ipv4_address: 172.20.0.5
