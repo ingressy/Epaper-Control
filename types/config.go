@@ -22,7 +22,10 @@ type config struct {
 var Config config
 
 func Loadconfig() {
-	loadFromFile()
+	if err := loadFromFile(); err != nil {
+		slog.Error("config.json konnte nicht geladen werden", "err", err)
+		os.Exit(1)
+	}
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -48,7 +51,9 @@ func watchConfig(watcher *fsnotify.Watcher) {
 			}
 			if event.Has(fsnotify.Write) || event.Has(fsnotify.Create) {
 				slog.Info("config.json geändert, wird neu eingelesen")
-				loadFromFile()
+				if err := loadFromFile(); err != nil {
+					slog.Error("config.json ungültig, alte Config bleibt aktiv", "err", err)
+				}
 			}
 		case err, ok := <-watcher.Errors:
 			if !ok {
@@ -59,17 +64,12 @@ func watchConfig(watcher *fsnotify.Watcher) {
 	}
 }
 
-func loadFromFile() {
+func loadFromFile() error {
 	file, err := os.ReadFile("config.json")
 	if err != nil {
-		slog.Error("Fehler beim Lesen der JSON", "error", err)
-		os.Exit(1)
+		return err
 	}
-	err = json.Unmarshal(file, &Config)
-	if err != nil {
-		slog.Error("Fehler beim Lesen der JSON", "error", err)
-		os.Exit(1)
-	}
+	return json.Unmarshal(file, &Config)
 }
 
 func SaveConfig() error {

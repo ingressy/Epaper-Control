@@ -39,7 +39,10 @@ func (e *Epd) UnmarshalJSON(b []byte) error {
 }
 
 func Loadepd() {
-	loadfromfileepd()
+	if err := loadfromfileepd(); err != nil {
+		slog.Error("EPD-Konfiguration konnte nicht geladen werden", "error", err)
+		os.Exit(1)
+	}
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -68,7 +71,9 @@ func watchEPD(watcher *fsnotify.Watcher) {
 				}
 				timer = time.AfterFunc(100*time.Millisecond, func() {
 					slog.Info("epd.json geändert, wird neu eingelesen")
-					loadfromfileepd()
+					if err := loadfromfileepd(); err != nil {
+						slog.Error("epd.json ungültig, alter Stand bleibt aktiv", "error", err)
+					}
 				})
 			}
 		case err, ok := <-watcher.Errors:
@@ -80,23 +85,25 @@ func watchEPD(watcher *fsnotify.Watcher) {
 	}
 }
 
-func loadfromfileepd() {
-	epdsMu.Lock()
-	defer epdsMu.Unlock()
-
+func loadfromfileepd() error {
 	file, err := os.ReadFile("epd.json")
 	if err != nil {
-		slog.Error("Fehler beim Lesen der JSON", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("epd.json lesen: %w", err)
 	}
+
 	var config struct {
 		EPD []Epd `json:"epd"`
 	}
 	if err := json.Unmarshal(file, &config); err != nil {
-		slog.Error("Fehler beim Parsen der JSON", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("epd.json parsen: %w", err)
 	}
+
+	// erst wenn alles geparst ist, die aktive Struktur tauschen
+	epdsMu.Lock()
 	EPDs = config.EPD
+	epdsMu.Unlock()
+
+	return nil
 }
 
 func GetRoomfromID(id string) string {

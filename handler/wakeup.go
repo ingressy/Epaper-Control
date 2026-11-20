@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -16,6 +17,11 @@ func Getwakeuptime(room string) int {
 		result = forced
 	}
 
+	// wakeup time ist schon vorbei
+	if result < 0 {
+		result = 0
+	}
+
 	return result
 }
 
@@ -26,14 +32,21 @@ func getScheduleBasedWakeup(room string) int {
 		if err := json.Unmarshal(data, &resp); err == nil && len(resp.Lessons) > 0 {
 			now := time.Now()
 			nowMinutes := now.Hour()*60 + now.Minute()
-			nextlesson := resp.Lessons[0]
-			startMinutes := parseTime(nextlesson.StartTime)
 
-			if startMinutes > nowMinutes {
-				return startMinutes - nowMinutes
+			for _, lesson := range resp.Lessons {
+				startMinutes, okStart := parseTime(lesson.StartTime)
+				endMinutes, okEnd := parseTime(lesson.EndTime)
+				if !okStart || !okEnd {
+					continue
+				}
+				if endMinutes > nowMinutes {
+					if startMinutes > nowMinutes {
+						return startMinutes - nowMinutes
+					}
+					return endMinutes - nowMinutes
+				}
 			}
-			endMinutes := parseTime(nextlesson.EndTime)
-			return endMinutes - nowMinutes
+			return 24 * 60
 		}
 	}
 
@@ -48,7 +61,12 @@ func getScheduleBasedWakeup(room string) int {
 
 	nextlesson := resp.Lessons[0]
 	nextLessonDate, _ := time.ParseInLocation("2006-01-02", nextlesson.Date, time.Local)
-	sleeptime := parseTime(nextlesson.StartTime)
+	sleeptime, ok := parseTime(nextlesson.StartTime)
+
+	if !ok {
+		return 6 * 60
+	}
+
 	lessonTime := nextLessonDate.Add(time.Duration(sleeptime) * time.Minute)
 	sleepDuration := time.Until(lessonTime)
 
@@ -75,7 +93,12 @@ func minutesUntilNextForcedWake() int {
 		}
 
 		for _, t := range forcedWakeTimes {
-			wakeMinutes := parseTime(t)
+			wakeMinutes, ok := parseTime(t)
+
+			if !ok {
+				continue
+			}
+
 			wakeTime := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, day.Location()).
 				Add(time.Duration(wakeMinutes) * time.Minute)
 
@@ -88,11 +111,29 @@ func minutesUntilNextForcedWake() int {
 	return int(^uint(0) >> 1) // sollte praktisch nie eintreten
 }
 
-func parseTime(t string) int {
+func parseTime(t string) (int, bool) {
+	t = strings.TrimSpace(t)
+	t = strings.Replace(t, ":", "", 1)
+
+	if len(t) == 3 {
+		t = "0" + t
+	}
+
 	if len(t) != 4 {
-		return 10 * 60
+		return 0, false
+	}
+
+	for i := 0; i < len(t); i++ {
+		if t[i] < '0' || t[i] > '9' {
+			return 0, false
+		}
 	}
 	hours := int(t[0]-'0')*10 + int(t[1]-'0')
 	mins := int(t[2]-'0')*10 + int(t[3]-'0')
-	return hours*60 + mins
+
+	if hours > 23 || mins > 59 {
+		return 0, false
+	}
+
+	return hours*60 + mins, true
 }

@@ -27,17 +27,21 @@ func ConnecttoMQTT() {
 
 	//auto reconnect
 	opts.SetAutoReconnect(true)
-	opts.SetConnectRetry(true)
-	opts.SetConnectRetryInterval(5 * time.Second)
+	opts.OnConnect = func(c mqtt.Client) {
+		subscribe(c)
+	}
 
 	client := mqtt.NewClient(opts)
-	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		panic(token.Error())
-	}
-	subscribe(client)
 
-	//time.Sleep(22 * 1000)
-	//depatched i think
+	for {
+		token := client.Connect()
+		token.Wait()
+		if token.Error() == nil {
+			break
+		}
+		slog.Error("MQTT Verbindung fehlgeschlagen, versuche es in 10s erneut", "error", token.Error())
+		time.Sleep(10 * time.Second)
+	}
 
 	untis.Get_room_from_json()
 	handler.PrepareJSON()
@@ -138,11 +142,15 @@ func sendsleep(c mqtt.Client, id string) {
 
 	var sekunden int
 
-	//if wartun sleep for 30min if not sleep antil next lesson
 	if !types.Config.Wartung {
 		sekunden = handler.Getwakeuptime(types.GetRoomfromID(id)) * 60
 	} else {
-		sekunden = 30 * 60
+		sekunden = types.Config.Wartung_sleep_time * 60
+	}
+
+	if sekunden < 0 {
+		slog.Error("Negative Schlafdauer berechnet, sende keinen Sleep-Befehl", "id", id, "sekunden", sekunden)
+		return
 	}
 
 	send := c.Publish(responseTopic, 1, true, fmt.Sprintf("%d", sekunden))

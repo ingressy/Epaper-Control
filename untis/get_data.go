@@ -14,12 +14,14 @@ const outputDir = "untis/cache/"
 func Get_room_from_json() {
 	data, err := os.ReadFile("untis/room.json")
 	if err != nil {
-		panic(err)
+		slog.Error("room.json nicht lesbar", "error", err)
+		return
 	}
 
 	var rooms []types.Room
 	if err := json.Unmarshal(data, &rooms); err != nil {
-		panic(err)
+		slog.Error("room.json Parsefehler", "error", err)
+		return
 	}
 
 	for _, r := range rooms {

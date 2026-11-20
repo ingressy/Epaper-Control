@@ -28,12 +28,14 @@ const hexDir = "handler/image_hex/"
 func PrepareJSON() {
 	data, err := os.ReadFile("untis/room.json")
 	if err != nil {
-		panic(err)
+		slog.Error("room.json nicht lesbar", "error", err)
+		return
 	}
 
 	var rooms []types.Room
 	if err := json.Unmarshal(data, &rooms); err != nil {
-		panic(err)
+		slog.Error("room.json Parsefehler", "error", err)
+		return
 	}
 
 	// Ordner erstellen falls nicht vorhanden
@@ -51,7 +53,8 @@ func PrepareJSON() {
 
 		var resp Response
 		if err := json.Unmarshal(data, &resp); err != nil {
-			return
+			slog.Error("Cache Parsefehler", "room", r.Room, "error", err)
+			continue
 		}
 		//time cheat
 		//today := now().Format("2006-01-02")
@@ -76,7 +79,7 @@ func PrepareJSON() {
 		filename := filepath.Join(outputDir, r.Room+".json")
 		err = os.WriteFile(filename, formatted, 0644)
 		if err != nil {
-			slog.Error("Datei schreiben", "error", err)
+			slog.Error("Datei schreiben", "room", r.Room, "error", err)
 			return
 		}
 
@@ -87,12 +90,14 @@ func PrepareJSON() {
 func Getpicturehex() {
 	data, err := os.ReadFile("untis/room.json")
 	if err != nil {
-		panic(err)
+		slog.Error("room.json nicht lesbar", "error", err)
+		return
 	}
 
 	var rooms []types.Room
 	if err := json.Unmarshal(data, &rooms); err != nil {
-		panic(err)
+		slog.Error("room.json Parsefehler", "error", err)
+		return
 	}
 
 	//create folder for image hex json
