@@ -60,7 +60,12 @@ func getScheduleBasedWakeup(room string) int {
 	}
 
 	nextlesson := resp.Lessons[0]
-	nextLessonDate, _ := time.ParseInLocation("2006-01-02", nextlesson.Date, time.Local)
+	nextLessonDate, err := time.ParseInLocation("2006-01-02", nextlesson.Date, time.Local)
+
+	if err != nil {
+		return 6 * 60
+	}
+
 	sleeptime, ok := parseTime(nextlesson.StartTime)
 
 	if !ok {

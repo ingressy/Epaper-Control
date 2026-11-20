@@ -29,7 +29,7 @@ func LoggingHandler() {
 
 	slog.SetDefault(logger)
 
-	logCron := cron.New()
+	logCron = cron.New()
 	if _, err := logCron.AddFunc("0 0 * * *", func() {
 		if err := willi.Rotate(); err != nil {
 			logger.Error("log rotation error", "err", err)

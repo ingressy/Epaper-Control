@@ -76,7 +76,7 @@ func addTimestamp(img image.Image) image.Image {
 		Dst:  dst,
 		Src:  image.NewUniform(color.Black), // Textfarbe
 		Face: basicfont.Face7x13,
-		Dot:  fixed.P(5, 295), // Position (x, y) – unten links
+		Dot:  fixed.P(5, bounds.Min.Y-5), // Position (x, y) – unten links
 	}
 	d.DrawString(timestamp)
 
