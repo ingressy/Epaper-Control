@@ -142,10 +142,11 @@ func sendsleep(c mqtt.Client, id string) {
 
 	var sekunden int
 
-	if !types.Config.Wartung {
+	cfg := types.GetConfig()
+	if !cfg.Wartung {
 		sekunden = handler.Getwakeuptime(types.GetRoomfromID(id)) * 60
 	} else {
-		sekunden = types.Config.Wartung_sleep_time * 60
+		sekunden = cfg.Wartung_sleep_time * 60
 	}
 
 	if sekunden < 0 {

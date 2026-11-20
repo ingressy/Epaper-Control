@@ -25,6 +25,8 @@ type ImageResponse struct {
 const outputDir = "handler/cache/"
 const hexDir = "handler/image_hex/"
 
+var httpClient = &http.Client{Timeout: 10 * time.Second}
+
 func PrepareJSON() {
 	data, err := os.ReadFile("untis/room.json")
 	if err != nil {
@@ -114,33 +116,41 @@ func Getpicturehex() {
 			continue
 		}
 		// generate image
-		httpResp, err := http.Post("http://172.20.0.4:72/generate", "application/json", bytes.NewBuffer(formatted))
+		httpResp, err := httpClient.Post("http://172.20.0.4:72/generate", "application/json", bytes.NewBuffer(formatted))
 		if err != nil {
 			slog.Error("POST Fehler", "room", r.Room, "error", err)
 			continue
 		}
-		defer httpResp.Body.Close()
 		_, err = io.ReadAll(httpResp.Body)
+		httpResp.Body.Close()
 		if err != nil {
 			slog.Error("Antwort lesen", "error", err)
+			continue
+		}
+
+		if httpResp.StatusCode != http.StatusOK {
+			slog.Error("ImageGen POST Status", "room", r.Room, "status", httpResp.StatusCode)
 			continue
 		}
 
 		// get image hex
-		httpResp, err = http.Get("http://172.20.0.4:72/image?room=" + r.Room)
+		httpResp, err = httpClient.Get("http://172.20.0.4:72/image?room=" + r.Room)
 		if err != nil {
 			slog.Error("Fehler", "error", err)
 			continue
 		}
-		defer httpResp.Body.Close()
 
 		body, err := io.ReadAll(httpResp.Body)
+		httpResp.Body.Close()
 		if err != nil {
 			slog.Error("Antwort lesen", "error", err)
 			continue
 		}
 
-		//fmt.Printf("Raw Antwort:", body)
+		if httpResp.StatusCode != http.StatusOK {
+			slog.Error("ImageGen Get Status", "room", r.Room, "status", httpResp.StatusCode)
+			continue
+		}
 
 		// JSON parsen
 		var imgResp ImageResponse

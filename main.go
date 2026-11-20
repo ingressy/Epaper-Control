@@ -67,9 +67,14 @@ func main() {
 
 	go mqtt.ConnecttoMQTT()
 
-	r.Run("0.0.0.0:80")
+	go func() {
+		if err := r.Run("0.0.0.0:80"); err != nil {
+			slog.Error("HTTP Server beendet mit Fehler", "error", err)
+		}
+	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
+	slog.Info("Server wird beendet")
 }

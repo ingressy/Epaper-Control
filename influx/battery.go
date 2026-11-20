@@ -12,7 +12,7 @@ var influxClient influxdb2.Client
 func InitInflux() {
 	influxClient = influxdb2.NewClient(
 		"http://172.20.0.6:8086",
-		types.Config.InfluxToken,
+		types.GetConfig().InfluxToken,
 	)
 }
 

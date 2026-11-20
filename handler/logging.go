@@ -11,11 +11,12 @@ import (
 )
 
 func LoggingHandler() {
+	cfg := types.GetConfig()
 	willi := &lumberjack.Logger{
-		Filename:   types.Config.Log_Filename,
-		MaxAge:     types.Config.Log_Max_Age,
-		MaxBackups: types.Config.Log_Max_Backups,
-		Compress:   types.Config.Log_compress,
+		Filename:   cfg.Log_Filename,
+		MaxAge:     cfg.Log_Max_Age,
+		MaxBackups: cfg.Log_Max_Backups,
+		Compress:   cfg.Log_compress,
 	}
 
 	multiwriter := io.MultiWriter(willi, os.Stdout)

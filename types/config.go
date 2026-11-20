@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"os"
+	"sync"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -19,7 +20,17 @@ type config struct {
 	Log_compress       bool     `json:"log_compress"`
 }
 
-var Config config
+var (
+	Config   config
+	configMu sync.RWMutex
+)
+
+// Caller for config struct
+func GetConfig() config {
+	configMu.RLock()
+	defer configMu.RUnlock()
+	return Config
+}
 
 func Loadconfig() {
 	if err := loadFromFile(); err != nil {
@@ -65,14 +76,28 @@ func watchConfig(watcher *fsnotify.Watcher) {
 }
 
 func loadFromFile() error {
+	var cfg config
+
 	file, err := os.ReadFile("config.json")
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(file, &Config)
+	if err := json.Unmarshal(file, &cfg); err != nil {
+		return err
+	}
+	configMu.Lock()
+	Config = cfg
+	configMu.Unlock()
+	return nil
 }
 
 func SaveConfig() error {
+	configMu.RLock()
+	defer configMu.RUnlock()
+	return saveConfigLocked()
+}
+
+func saveConfigLocked() error {
 	data, err := json.MarshalIndent(Config, "", "  ")
 	if err != nil {
 		return err

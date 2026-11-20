@@ -15,7 +15,7 @@ import (
 func SendImage(c mqtt.Client, id string) {
 	time.Sleep(5 * time.Second)
 	//if wartung is enable send wartungs image
-	if types.Config.Wartung {
+	if types.GetConfig().Wartung {
 		imageData, err := loadImage("mqtt/wartung.png")
 
 		if err != nil {
