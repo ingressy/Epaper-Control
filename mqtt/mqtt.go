@@ -63,6 +63,11 @@ func onAwake(c mqtt.Client, msg mqtt.Message) {
 	id := parts[0]
 	awakeMu.Lock()
 	awakeTimes[id] = time.Now()
+	for k, t := range awakeTimes {
+		if time.Since(t) > 25*time.Hour {
+			delete(awakeTimes, k)
+		}
+	}
 	awakeMu.Unlock()
 
 	payload := strings.Split(string(msg.Payload()), ",")
@@ -74,8 +79,12 @@ func onAwake(c mqtt.Client, msg mqtt.Message) {
 
 	slog.Info("EPD wach", "id", id, "akku", batteryvolt, "errorcode", errorcode)
 
-	battery, _ := strconv.ParseFloat(batteryvolt, 8)
-	influx.SaveBatteryInflux(id, battery)
+	battery, err := strconv.ParseFloat(batteryvolt, 64)
+	if err != nil {
+		slog.Error("Batteriewert nicht parsebar", "id", id, "wert", batteryvolt, "error", err)
+	} else {
+		influx.SaveBatteryInflux(id, battery)
+	}
 
 	room := types.GetRoomfromID(id)
 	wasNight, _ := types.GetNightsleep(id)

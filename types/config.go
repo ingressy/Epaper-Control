@@ -41,7 +41,7 @@ func Loadconfig() {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		slog.Error("Fehler beim Erstellen des Watchers", "error", err)
-		os.Exit(0)
+		os.Exit(1)
 	}
 	if err := watcher.Add("config.json"); err != nil {
 		slog.Error("Fehler beim Hinzufügen der Datei", "error", err)

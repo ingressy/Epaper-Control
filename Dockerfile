@@ -1,4 +1,4 @@
-FROM golang:1.26 AS builder
+FROM golang:1.27 AS builder
 
 WORKDIR /app
 
@@ -8,7 +8,7 @@ RUN go mod download
 RUN go install github.com/swaggo/swag/cmd/swag@latest
 
 COPY . .
-RUN swag init -g /main.go
+RUN swag init -g main.go
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o main
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o token ./rest/token
@@ -23,7 +23,6 @@ WORKDIR /root/
 COPY --from=builder /app/main .
 COPY --from=builder /app/token .
 
-EXPOSE 70
 EXPOSE 80
 
 CMD [ "./main" ]

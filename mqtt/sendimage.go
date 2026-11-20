@@ -48,7 +48,8 @@ func SendImage(c mqtt.Client, id string) {
 			p = strings.TrimSpace(p)
 			val, err := strconv.ParseUint(strings.TrimPrefix(p, "0x"), 16, 8)
 			if err != nil {
-				slog.Error("Hex nicht lesbar", "error", err)
+				slog.Error("Hex nicht parsebar, sende kein korruptes Bild", "room", room, "index", i, "error", err)
+				return
 			}
 			imageBytes[i] = byte(val)
 		}

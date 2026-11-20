@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -134,7 +135,7 @@ func Getpicturehex() {
 		}
 
 		// get image hex
-		httpResp, err = httpClient.Get("http://172.20.0.4:72/image?room=" + r.Room)
+		httpResp, err = httpClient.Get("http://172.20.0.4:72/image?room=" + url.QueryEscape(r.Room))
 		if err != nil {
 			slog.Error("Fehler", "error", err)
 			continue

@@ -2,6 +2,8 @@ package influx
 
 import (
 	"Control/types"
+	"context"
+	"log/slog"
 	"time"
 
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
@@ -17,13 +19,14 @@ func InitInflux() {
 }
 
 func SaveBatteryInflux(id string, battery float64) {
-	writeAPI := influxClient.WriteAPI(
+	writeAPI := influxClient.WriteAPIBlocking(
 		"epaper",
 		"display",
 	)
 
 	p := influxdb2.NewPointWithMeasurement("battery").AddTag("device", id).AddField("volt", battery).SetTime(time.Now())
 
-	writeAPI.WritePoint(p)
-	writeAPI.Flush()
+	if err := writeAPI.WritePoint(context.Background(), p); err != nil {
+		slog.Error("Influx Battery Write Fehler", "error", err)
+	}
 }
