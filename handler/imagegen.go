@@ -117,7 +117,7 @@ func Getpicturehex() {
 			continue
 		}
 		// generate image
-		httpResp, err := httpClient.Post("http://172.20.0.4:72/generate", "application/json", bytes.NewBuffer(formatted))
+		httpResp, err := httpClient.Post(types.ImagegenURL+"generate", "application/json", bytes.NewBuffer(formatted))
 		if err != nil {
 			slog.Error("POST Fehler", "room", r.Room, "error", err)
 			continue
@@ -135,7 +135,7 @@ func Getpicturehex() {
 		}
 
 		// get image hex
-		httpResp, err = httpClient.Get("http://172.20.0.4:72/image?room=" + url.QueryEscape(r.Room))
+		httpResp, err = httpClient.Get((types.ImagegenURL + "/image?room=" + url.QueryEscape(r.Room)))
 		if err != nil {
 			slog.Error("Fehler", "error", err)
 			continue
