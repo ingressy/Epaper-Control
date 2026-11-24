@@ -34,7 +34,7 @@ func Get_room_from_json() {
 }
 
 func Get_data(room string) {
-	resp, err := httpClient.Get("http://172.20.0.3:71/untis?room=" + url.QueryEscape(room))
+	resp, err := httpClient.Get(types.UntisURL + "/untis?room=" + url.QueryEscape(room))
 	if err != nil {
 		slog.Error("Untis Microservice nicht erreichbar", "error", err)
 		return

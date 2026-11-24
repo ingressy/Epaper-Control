@@ -22,7 +22,7 @@ var (
 
 func ConnecttoMQTT() {
 	opts := mqtt.NewClientOptions()
-	opts.AddBroker("tcp://172.20.0.5:1883")
+	opts.AddBroker(types.MQTTBroker)
 	opts.SetClientID("Epaper-Control")
 
 	//auto reconnect
