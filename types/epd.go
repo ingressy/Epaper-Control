@@ -145,11 +145,15 @@ func SetNightSleep(id string, change bool) error {
 		return err
 	}
 
-	tmp := "epd.json.tmp"
-	if err := os.WriteFile(tmp, formatted, 0644); err != nil {
+	f, err := os.OpenFile("edp.json", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, "epd.json")
+	if _, err := f.Write(formatted); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }
 
 func GetNightsleep(id string) (bool, error) {
