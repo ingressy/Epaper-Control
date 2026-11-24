@@ -135,7 +135,7 @@ func Getpicturehex() {
 		}
 
 		// get image hex
-		httpResp, err = httpClient.Get((types.ImagegenURL + "/image?room=" + url.QueryEscape(r.Room)))
+		httpResp, err = httpClient.Get((types.ImagegenURL + "image?room=" + url.QueryEscape(r.Room)))
 		if err != nil {
 			slog.Error("Fehler", "error", err)
 			continue
